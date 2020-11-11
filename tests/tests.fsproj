@@ -19,7 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="Utils.fs"/>
+    <Compile Include="Verify.fs"/>
     <Compile Include="Recognize.fs"/>
+    <Compile Include="Combinator.fs"/>
   </ItemGroup>
 
 </Project>

@@ -1,17 +1,18 @@
 module Figtree.Produce
+
 open Figtree.Rule
 
-let private csub (a: char) (b: char) = (int a) - (int b) 
-let private cadd (a: char) (b: int) = char ((int a) + b) 
+let private csub (a: char) (b: char) = (int a) - (int b)
+let private cadd (a: char) (b: int) = char ((int a) + b)
 
-let produce (rules: RuleTable) (name: string) =
-    let g = System.Random()
+let produce (rt : RuleTable) (name : string) =
+    let g = System.Random ()
 
     let rec loop (rule: Rule) =
         match rule with
         | CharSet xs ->
             let i = g.Next() % Set.count xs
-            xs 
+            xs
             |> Set.toSeq
             |> Seq.skip i
             |> Seq.take 1
@@ -30,22 +31,22 @@ let produce (rules: RuleTable) (name: string) =
           |> String.concat ""
 
         | AnyOf xs ->
-            let i =  (g.Next() % List.length xs) 
-            xs 
+            let i =  (g.Next() % List.length xs)
+            xs
             |> List.skip i
             |> List.take 1
             |> List.map loop
             |> String.concat ""
-         
+
         | EachOf xs ->
-          xs 
+          xs
           |> List.map loop
           |> String.concat ""
 
         | Ref name ->
-            let rule = rules.[name]
+            let rule = (RuleTable.rules rt).[name]
             loop rule
 
-    let rule = rules.[name]
+    let rule = (RuleTable.rules rt).[name]
 
     loop rule

@@ -277,3 +277,6 @@ buckaroo-windows.exe
 warp/
 
 fsi.fsx
+
+.ionide
+*/.ionide

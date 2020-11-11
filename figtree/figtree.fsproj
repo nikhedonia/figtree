@@ -9,6 +9,7 @@
     <Compile Include="Match.fs" />
     <Compile Include="Recognize.fs" />
     <Compile Include="Produce.fs" />
+    <Compile Include="Combinator.fs" />
   </ItemGroup>
 
   <ItemGroup>
