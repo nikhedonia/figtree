@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <Compile Include="Recognize.fs"/>
+    <Compile Include="Combinator.fs"/>
   </ItemGroup>
 
 </Project>
