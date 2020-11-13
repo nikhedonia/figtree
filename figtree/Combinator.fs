@@ -252,91 +252,86 @@ let rec runAll (xs: seq<Parser<'T>>) (state: State<Unit>) (str: string) = seq {
 
 // parse all in sequence and fail if one of the parsers fail
 let parseAll (xs: seq<Parser<'T>>) (state: State<Unit>) (str: string) =
-  let results = 
-    runAll xs state str
-    |> Seq.fold 
-      (fun acc result -> 
-        match acc, result with
-        | Error e, _ -> Error e
-        | Recursion (a,b), _ -> Recursion (a,b)
-        | Success acc, Success next -> 
-          Success {
-            Value = acc.Value@[next.Value]
-            Cache = next.Cache
-            View = next.View
-          }
-        | Partial (ids, acc), Success next -> 
-          Partial (ids, {
-            Value = acc.Value@[next.Value]
-            Cache = next.Cache
-            View = next.View
-          })
-        | Success acc, Partial (ids, next) -> 
-          Partial (ids, {
-            Value = acc.Value@[next.Value]
-            Cache = next.Cache
-            View = next.View
-          })
-        | Partial (ids, acc), Partial (ids2, next) -> 
-          Partial ((Set.union ids ids2), {
-            Value = acc.Value@[next.Value]
-            Cache = next.Cache
-            View = next.View
-          })
-        | _, Recursion (a,b) -> Recursion (a,b)
-        | _, Error e -> Error e )
-       (Success {
-         Value = []
-         Cache = state.Cache
-         View = state.View
-       })
-  results
+  runAll xs state str
+  |> Seq.fold 
+    (fun acc result -> 
+      match acc, result with
+      | Error e, _ -> Error e
+      | Recursion (a,b), _ -> Recursion (a,b)
+      | Success acc, Success next -> 
+        Success {
+          Value = acc.Value@[next.Value]
+          Cache = next.Cache
+          View = next.View
+        }
+      | Partial (ids, acc), Success next -> 
+        Partial (ids, {
+          Value = acc.Value@[next.Value]
+          Cache = next.Cache
+          View = next.View
+        })
+      | Success acc, Partial (ids, next) -> 
+        Partial (ids, {
+          Value = acc.Value@[next.Value]
+          Cache = next.Cache
+          View = next.View
+        })
+      | Partial (ids, acc), Partial (ids2, next) -> 
+        Partial ((Set.union ids ids2), {
+          Value = acc.Value@[next.Value]
+          Cache = next.Cache
+          View = next.View
+        })
+      | _, Recursion (a,b) -> Recursion (a,b)
+      | _, Error e -> Error e )
+     (Success {
+       Value = []
+       Cache = state.Cache
+       View = state.View
+     })
 
 // returns longest sequence of successful parses
 let parseLongest (xs: seq<Parser<'T>>) (state: State<Unit>) (str: string) =
-  let results = 
-    runAll xs state str
-    |> Seq.fold
-      (fun acc result -> 
-        match acc, result with
-        | Error e, _ -> Error e
-        | Recursion (a,b), _ -> Recursion (a,b)
-        | acc, Recursion _ -> acc
-        | acc, Error _ -> acc
-        | Success acc, Success next -> 
-          Success {
-            Value = acc.Value@[next.Value]
-            Cache = next.Cache
-            View = next.View
-          }
-        | Partial (ids, acc), Success next -> 
-          Partial (ids, {
-            Value = acc.Value@[next.Value]
-            Cache = next.Cache
-            View = next.View
-          })
-        | Success acc, Partial (ids, next) -> 
-          Partial (ids, {
-            Value = acc.Value@[next.Value]
-            Cache = next.Cache
-            View = next.View
-          })
-        | Partial (ids, acc), Partial (ids2, next) -> 
-          Partial ((Set.union ids ids2), {
-            Value = acc.Value@[next.Value]
-            Cache = next.Cache
-            View = next.View
-          }))
-       (Success {
-         Value = []
-         Cache = state.Cache
-         View = state.View
-       })
-  results
+  runAll xs state str
+  |> Seq.fold
+    (fun acc result -> 
+      match acc, result with
+      | Error e, _ -> Error e
+      | Recursion (a,b), _ -> Recursion (a,b)
+      | acc, Recursion _ -> acc
+      | acc, Error _ -> acc
+      | Success acc, Success next -> 
+        Success {
+          Value = acc.Value@[next.Value]
+          Cache = next.Cache
+          View = next.View
+        }
+      | Partial (ids, acc), Success next -> 
+        Partial (ids, {
+          Value = acc.Value@[next.Value]
+          Cache = next.Cache
+          View = next.View
+        })
+      | Success acc, Partial (ids, next) -> 
+        Partial (ids, {
+          Value = acc.Value@[next.Value]
+          Cache = next.Cache
+          View = next.View
+        })
+      | Partial (ids, acc), Partial (ids2, next) -> 
+        Partial ((Set.union ids ids2), {
+          Value = acc.Value@[next.Value]
+          Cache = next.Cache
+          View = next.View
+        }))
+     (Success {
+       Value = []
+       Cache = state.Cache
+       View = state.View
+     })
 
 // find best possible alternative
 let rec bestOf (xs: List<Parser<'T>>): Parser<'T> =
-
   let run (state: State<Unit>) (str: string) = 
     let removeRecursionNodesOfAlternatives = 
       state.Cache 
@@ -416,4 +411,3 @@ let tryParse (p: Parser<'T>) (state: State<Unit>) (str: string): ParseResult<Opt
     View = state.View
     Cache = e.Cache
   }
-    
