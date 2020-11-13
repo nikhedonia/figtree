@@ -8,12 +8,6 @@ type MyTests() =
 
     let mutable exprR = Parse "dummy" { return 0; } 
 
-    let getView (state: State<Unit>) (str: string) = Success {
-           Value = state.View; 
-           View = state.View; 
-           Cache = state.Cache
-        }
-    
     let binary (op: string) = Parse ("binary", op) {
         let! x = exprR
         let! _ = parseString op
@@ -25,7 +19,6 @@ type MyTests() =
         let! _ = parseString "("
         let! x = exprR
         let! _ = parseString ")"
-        let! v = getView
         return x
     }
 
