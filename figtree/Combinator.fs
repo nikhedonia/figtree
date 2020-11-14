@@ -6,24 +6,24 @@ type View = {
   
   with static member Zero = {Start = 0; End = 0}
 
-type CacheAction<'T> =
-| Fail of View
+type CacheAction<'T, 'E> =
+| Fail of View * 'E
 | Recurse of int
 | Complete of View * 'T
 and State<'T> = {
-    Value: 'T
-    View: View
-    Cache: Cache
-} and Cache = Map<int*int, CacheAction<obj>>
-and ParseResult<'T> =
+  Value: 'T
+  View: View
+  Cache: Cache
+} and Cache = Map<int*int, CacheAction<obj, obj>>
+and ParseResult<'T, 'E> =
 | Success of State<'T>
 | Partial of Set<int> * State<'T>
 | Recursion of Set<int> * State<Unit> 
-| Error of State<Unit>
-and Parser<'T> = State<Unit> -> string -> ParseResult<'T>
+| Error of State<'E>
+and Parser<'T, 'E> = State<Unit> -> string -> ParseResult<'T, 'E>
 
 
-type ParserCombinator<'T, 'U> = 'T -> Parser<'U>
+type ParserCombinator<'T, 'U, 'E> = 'T -> Parser<'U, 'E>
 
 let zero = {
   Value = ()
@@ -38,28 +38,28 @@ module Parser =
     Cache = s.Cache
   }
 
-  let rec getState (s: ParseResult<'T>) =
+  let rec getState (s: ParseResult<'T, 'E>) =
     match s with
     | Success x -> strip x
     | Recursion (_, x) -> x
     | Partial (_, x) -> strip x
-    | Error x -> x
+    | Error x -> strip x
 
-  let rec getCache (s: ParseResult<'T>) =
+  let rec getCache (s: ParseResult<'T, 'E>) =
     match s with
     | Success x -> x.Cache
     | Recursion (_, x) -> x.Cache
     | Partial (_, x) -> x.Cache
     | Error x -> x.Cache
 
-  let rec updateCache (u: Cache -> Cache) (s: ParseResult<'T>) =
+  let rec updateCache (u: Cache -> Cache) (s: ParseResult<'T, 'E>) =
     match s with
     | Success x -> Success { x with Cache = u x.Cache }
     | Recursion (ids, x) -> Recursion (ids, { x with Cache = u x.Cache })
     | Partial (ids, x) -> Partial (ids, { x with Cache = u x.Cache })
     | Error x -> Error { x with Cache = u x.Cache }
 
-  let setStart (start: int) (r: ParseResult<'T>) =
+  let setStart (start: int) (r: ParseResult<'T, 'E>) =
       match r with
       | Success s -> Success {s with View = {s.View with Start = start}}
       | Error s -> Error {s with View = {s.View with Start = start}}
@@ -74,13 +74,13 @@ module Parser =
     | Recursion (id, s) -> (1, s.View.End)
     | Error s -> (0, s.View.End)
 
-  let runParser (p: Parser<'T>) (state: State<Unit>) (str: string) =
+  let runParser (p: Parser<'T, 'E>) (state: State<Unit>) (str: string) =
     p state str
 
-  let rec parseAt (p: Parser<'T>) (x: State<_>) (str: string) =
+  let rec parseAt (p: Parser<'T, 'E>) (x: State<_>) (str: string) =
     p x str
 
-  let parse ( p: Parser<'T>) (str: string) = 
+  let parse ( p: Parser<'T, 'E>) (str: string) = 
     match parseAt p zero str with
     | Partial (id, x) ->
         if x.View.End = str.Length
@@ -95,7 +95,7 @@ module Parser =
     | Recursion (ids2, state) -> Recursion (Set.union ids ids2, state)
     | Partial (ids2, state) -> Partial (Set.union ids ids2, state)
 
-  let rec Bind (p: Parser<'T>) (pc: ParserCombinator<'T, 'U>) (x: State<Unit>) (str: string): ParseResult<'U> =
+  let rec Bind (p: Parser<'T, 'E>) (pc: ParserCombinator<'T, 'U, 'E>) (x: State<Unit>) (str: string): ParseResult<'U, 'E> =
     match runParser p x str with
     | Error x -> Error x
     | Success next -> runParser (pc next.Value) (strip next) str
@@ -111,7 +111,7 @@ module Parser =
         Cache = x.Cache
     }
 
-  let While (cond: Unit->bool) (f: Parser<'T>): Parser<Unit> =
+  let While (cond: Unit->bool) (f: Parser<'T, 'E>): Parser<Unit, 'E> =
     let rec loop (state: State<Unit>) (str: string) =
       if cond () 
       then 
@@ -123,7 +123,7 @@ module Parser =
       else Success state 
     loop
 
-  let map (f: 'T -> 'U) (r: ParseResult<'T>) =
+  let map (f: 'T -> 'U) (r: ParseResult<'T, 'E>) =
     match r with
     | Success s -> Success {
         Value = f s.Value
@@ -138,7 +138,18 @@ module Parser =
     | Error e -> Error e
     | Recursion (a, b) -> Recursion (a, b)
 
-  let ignore (r: ParseResult<'T>) = map (ignore) r
+  let mapError (f: 'E -> 'U) (r: ParseResult<'T, 'E>) =
+    match r with
+    | Success s -> Success s
+    | Partial (ids, s) -> Partial (ids, s)
+    | Error e -> Error {
+        Value = f e.Value
+        Cache = e.Cache
+        View = e.View 
+      }
+    | Recursion (a, b) -> Recursion (a, b)
+
+  let ignore (r: ParseResult<'T, 'E>) = map (ignore) r
 
 
 let noCache = () :> obj
@@ -149,19 +160,19 @@ type Parse (cacheKey: obj) =
 
   // Delay wraps the assembled Computation Expression in a function 
   // This inject caching and a bottom up parse step for left-recursive combinators
-  member this.Delay (f: ParserCombinator<Unit, 'T>) =
-    let rec updateCache (state: State<Unit>) (result: ParseResult<'T>) =
+  member this.Delay (f: ParserCombinator<Unit, 'T, 'E>) =
+    let rec updateCache (state: State<Unit>) (result: ParseResult<'T, 'E>) =
       let e = state.View.End
       match result |> Parser.setStart state.View.Start with
       | Success s -> Success {s with Cache = s.Cache |> Map.add (id, e) (Complete (s.View, s.Value :> obj))}
-      | Error s -> Error {s with Cache = s.Cache |> Map.add (id, e) (Fail s.View)}
+      | Error s -> Error {s with Cache = s.Cache |> Map.add (id, e) (Fail (s.View, s.Value :> obj))}
       | Partial (fid, s) -> Partial (fid, {s with Cache = s.Cache |> Map.add (id, e) (Complete (s.View, s.Value :> obj))})
       | Recursion (x, y) -> Recursion (x, y)
     
     let delay (state: State<Unit>) (str: string) =
         let e = state.View.End
         match state.Cache |> Map.tryFind (id, e) with
-        | Some (Fail view) -> Error {state with View = view}
+        | Some (Fail (view, value)) -> Error {Value = value :?> 'E ;View = view; Cache = state.Cache}
         | Some (Recurse id) ->
             // Recursion detected, don't continue computation
             Recursion (set[id], state)
@@ -174,29 +185,29 @@ type Parse (cacheKey: obj) =
             let rec shiftReduce next prev c =
                 match Parser.runParser (f()) next str |> updateCache state with
                 | Success s -> Success s
-                | Error _ -> prev
+                | Error e -> prev |> Option.defaultValue (Error e) 
                 | Recursion (fid, state) -> Recursion (Set.add id fid, state)
                 | Partial (fid, state) when not(Set.contains id fid) -> 
                     Partial (fid, state)
                 | Partial (_, result) ->
                     let r = Success result
-                    shiftReduce {Parser.getState r with View = state.View} r (c+1)
+                    shiftReduce {Parser.getState r with View = state.View} (Some r) (c+1)
  
             let next = {
                 state with 
                     Cache = Map.add (id, e) (Recurse id) state.Cache}
 
-            shiftReduce next (Error next) 1
+            shiftReduce next None 1
                   
     if id <> noCacheId 
     then delay
     else fun state str -> 
         Parser.runParser (f()) state str |> Parser.setStart state.View.Start
             
-  member this.While (cond: Unit -> bool, p: Parser<'T> ) = Parser.While cond p
+  member this.While (cond: Unit -> bool, p: Parser<'T, 'E> ) = Parser.While cond p
   member this.Return (value: 'T) = Parser.Return value
-  member this.ReturnFrom (p: Parser<'T>) = p
-  member this.Bind (p: Parser<'T>, pc: ParserCombinator<'T, 'U>): Parser<'U> =
+  member this.ReturnFrom (p: Parser<'T, 'E>) = p
+  member this.Bind (p: Parser<'T, 'E>, pc: ParserCombinator<'T, 'U, 'E>): Parser<'U, 'E> =
       Parser.Bind p pc
         
 // TODO: return/apply Rule instead of operating on strings directly
@@ -234,7 +245,7 @@ let private dropNewRecursions old k v =
   | _ -> true
 
 
-let rec runAll (xs: seq<Parser<'T>>) (state: State<Unit>) (str: string) = seq {
+let rec runAll (xs: seq<Parser<'T, 'E>>) (state: State<Unit>) (str: string) = seq {
   match xs |> Seq.tryHead with
   | None -> ()
   | Some p -> 
@@ -251,7 +262,7 @@ let rec runAll (xs: seq<Parser<'T>>) (state: State<Unit>) (str: string) = seq {
 }
 
 // parse all in sequence and fail if one of the parsers fail
-let parseAll (xs: seq<Parser<'T>>) (state: State<Unit>) (str: string) =
+let parseAll (xs: seq<Parser<'T, 'E>>) (state: State<Unit>) (str: string) =
   runAll xs state str
   |> Seq.fold 
     (fun acc result -> 
@@ -291,7 +302,7 @@ let parseAll (xs: seq<Parser<'T>>) (state: State<Unit>) (str: string) =
      })
 
 // returns longest sequence of successful parses
-let parseLongest (xs: seq<Parser<'T>>) (state: State<Unit>) (str: string) =
+let parseLongest (xs: seq<Parser<'T, 'E>>) (state: State<Unit>) (str: string) =
   runAll xs state str
   |> Seq.fold
     (fun acc result -> 
@@ -331,69 +342,70 @@ let parseLongest (xs: seq<Parser<'T>>) (state: State<Unit>) (str: string) =
      })
 
 // find best possible alternative
-let rec bestOf (xs: List<Parser<'T>>): Parser<'T> =
-  let run (state: State<Unit>) (str: string) = 
-    let removeRecursionNodesOfAlternatives = 
-      state.Cache 
-      |> Map.toSeq
-      |> Seq.filter isRecursion
-      |> Seq.map fst
-      |> set
-      |> dropNewRecursions
-      |> Map.filter
-      |> Parser.updateCache
-    
-    let ys = 
-      xs // investigate all alternatives and populate cache
-      |> Seq.scan (fun (s: ParseResult<'T>) (p: Parser<'T>) -> 
-          let next = {
-              Parser.getState s 
-              with View = state.View // reset the cursor
-          } 
+let rec bestOf (xs: List<Parser<'T, 'E>>) (state: State<Unit>) (str: string): ParseResult<'T, 'E> = 
+  let removeRecursionNodesOfAlternatives = 
+    state.Cache 
+    |> Map.toSeq
+    |> Seq.filter isRecursion
+    |> Seq.map fst
+    |> set
+    |> dropNewRecursions
+    |> Map.filter
+    |> Parser.updateCache
+  
+  let ys = 
+    xs // investigate all alternatives and populate cache
+    |> Seq.scan (fun (_, s) (p: Parser<'T, 'E>) -> 
+        let next = {
+            s
+            with View = state.View // reset the cursor
+        } 
+        let next =
           Parser.parseAt p next str 
           |> removeRecursionNodesOfAlternatives
-      ) (Error state) // return error if xs is empty
-      |> Seq.sortByDescending(fun x -> (Parser.getState x).View.End)
-      |> Seq.toList
+        (Some next, Parser.getState next)
+    ) (None, state)
+    |> Seq.choose fst
+    |> Seq.sortByDescending(fun x -> (Parser.getState x).View.End)
+    |> Seq.toList
 
-    let recursive = ys |> Seq.filter(function | Recursion _ -> true | _ -> false) 
-    let partials = ys |> Seq.filter(function | Partial _ -> true | _ -> false)
+  let recursive = ys |> Seq.filter(function | Recursion _ -> true | _ -> false) 
+  let partials = ys |> Seq.filter(function | Partial _ -> true | _ -> false)
 
-    // list of recursive parsers
-    // if recursion is detected then we only have a partial result
-    let ids =
-      (Seq.concat [
-          recursive
-          partials
-      ])
-      |> Seq.choose (function | Recursion (ids,_) -> Some (ids) | Partial (ids, _) -> Some ids | _ -> None)
-      |> Set.unionMany
+  // list of recursive parsers
+  // if recursion is detected then we only have a partial result
+  let ids =
+    (Seq.concat [
+        recursive
+        partials
+    ])
+    |> Seq.choose (function | Recursion (ids,_) -> Some (ids) | Partial (ids, _) -> Some ids | _ -> None)
+    |> Set.unionMany
 
-    let complete = 
-      ys 
-      |> List.choose
-        (function 
-        | Success x -> 
-          Some
-            (if ids |> Set.count > 0 
-             then Partial (ids, x)
-             else Success x)
-        | _ -> None)
+  let complete = 
+    ys 
+    |> List.choose
+      (function 
+      | Success x -> 
+        Some
+          (if ids |> Set.count > 0 
+           then Partial (ids, x)
+           else Success x)
+      | _ -> None)
 
-    let errors = 
-      ys 
-      |> List.filter(function Error _ -> true | _ -> false)
+  let errors = 
+    ys 
+    |> List.filter(function Error _ -> true | _ -> false)
 
-    Seq.concat [
-      complete
-      errors
-    ] 
-    |> Seq.sortByDescending Parser.score
-    |> Seq.head
-    
-  run
+  Seq.concat [
+    complete
+    errors
+  ] 
+  |> Seq.sortByDescending Parser.score
+  |> Seq.head
 
-let tryParse (p: Parser<'T>) (state: State<Unit>) (str: string): ParseResult<Option<'T>> =
+
+let tryParse (p: Parser<'T, 'E>) (state: State<Unit>) (str: string): ParseResult<Option<'T>, 'E> =
   match p state str with
   | Success x -> Success {
       Value = Some x.Value
@@ -405,9 +417,14 @@ let tryParse (p: Parser<'T>) (state: State<Unit>) (str: string): ParseResult<Opt
       View = x.View
       Cache = x.Cache
     })
-  | Recursion (a, b) -> Recursion (a, b) // or Partial id {Value=None} ???
+  | Recursion (a, b) -> Recursion (a, b)
   | Error e -> Success {
     Value = None
     View = state.View
     Cache = e.Cache
   }
+
+let recursive<'T, 'E> (f: (Ref<Parser<'T, 'E>>) -> Parser<'T, 'E>): Parser<'T, 'E> =
+  let mutable self: Ref<Parser<'T, 'E>> = ref (Unchecked.defaultof<Parser<'T, 'E>>)
+  self := f(self)
+  !self
