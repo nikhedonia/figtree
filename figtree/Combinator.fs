@@ -14,6 +14,7 @@ and State<'T> = {
   Value: 'T
   View: View
   Cache: Cache
+  Path: List<int> // list of obj?
 } and Cache = Map<int*int, CacheAction<obj, obj>>
 and ParseResult<'T, 'E> =
 | Success of State<'T>
@@ -29,6 +30,7 @@ let zero = {
   Value = ()
   View = {Start=0; End=0}
   Cache = Map.empty
+  Path = []
 }
 
 module Parser =
@@ -36,6 +38,7 @@ module Parser =
     Value = ()
     View = s.View
     Cache = s.Cache
+    Path = s.Path
   }
 
   let rec getState (s: ParseResult<'T, 'E>) =
@@ -109,6 +112,7 @@ module Parser =
         Value = value
         View = x.View
         Cache = x.Cache
+        Path = x.Path
     }
 
   let While (cond: Unit->bool) (f: Parser<'T, 'E>): Parser<Unit, 'E> =
@@ -129,11 +133,13 @@ module Parser =
         Value = f s.Value
         Cache = s.Cache
         View = s.View
+        Path = s.Path
       }
     | Partial (ids, s) -> Partial (ids, {
         Value = f s.Value
         Cache = s.Cache
         View = s.View
+        Path = s.Path
       })
     | Error e -> Error e
     | Recursion (a, b) -> Recursion (a, b)
@@ -146,6 +152,7 @@ module Parser =
         Value = f e.Value
         Cache = e.Cache
         View = e.View 
+        Path = e.Path
       }
     | Recursion (a, b) -> Recursion (a, b)
 
@@ -168,11 +175,21 @@ type Parse (cacheKey: obj) =
       | Error s -> Error {s with Cache = s.Cache |> Map.add (id, e) (Fail (s.View, s.Value :> obj))}
       | Partial (fid, s) -> Partial (fid, {s with Cache = s.Cache |> Map.add (id, e) (Complete (s.View, s.Value :> obj))})
       | Recursion (x, y) -> Recursion (x, y)
+
+    let updatePath (state: State<Unit>) = {
+      state with 
+        Path = 
+          if state.Path |> List.tryHead |> Option.contains id
+          then id::state.Path
+          else state.Path
+    }
+        
     
     let delay (state: State<Unit>) (str: string) =
+        let state = updatePath state
         let e = state.View.End
         match state.Cache |> Map.tryFind (id, e) with
-        | Some (Fail (view, value)) -> Error {Value = value :?> 'E ;View = view; Cache = state.Cache}
+        | Some (Fail (view, value)) -> Error {Value = value :?> 'E ;View = view; Cache = state.Cache; Path = state.Path}
         | Some (Recurse id) ->
             // Recursion detected, don't continue computation
             Recursion (set[id], state)
@@ -180,6 +197,7 @@ type Parse (cacheKey: obj) =
               Value =  value  :?> 'T
               View = v
               Cache = state.Cache
+              Path = state.Path
             }
         | None -> 
             let rec shiftReduce next prev c =
@@ -188,7 +206,10 @@ type Parse (cacheKey: obj) =
                 | Error e -> prev |> Option.defaultValue (Error e) 
                 | Recursion (fid, state) -> Recursion (Set.add id fid, state)
                 | Partial (fid, state) when not(Set.contains id fid) -> 
-                    Partial (fid, state)
+                    // Bubble Up - if there is no parent that can perform a shift-reduce, then we are done
+                    if state.Path |> List.tryFind (fun x -> fid |> Set.contains x) |> Option.isSome
+                    then Partial (fid, state)
+                    else Success state
                 | Partial (_, result) ->
                     let r = Success result
                     shiftReduce {Parser.getState r with View = state.View} (Some r) (c+1)
@@ -218,6 +239,7 @@ let parseString (x: string) =
     then Success {
         Value = x
         Cache = s.Cache
+        Path = s.Path
         View = {
           Start = s.View.End
           End = s.View.End + x.Length
@@ -226,6 +248,7 @@ let parseString (x: string) =
     else Error {
         Value = ()
         Cache = s.Cache
+        Path = s.Path
         View = {
           Start = s.View.Start
           End = s.View.Start
@@ -276,24 +299,28 @@ let parseAll (xs: seq<Parser<'T, 'E>>) (state: State<Unit>) (str: string) =
           Value = acc.Value@[next.Value]
           Cache = next.Cache
           View = next.View
+          Path = state.Path
         }
       | Partial (ids, acc), Success next -> 
         Partial (ids, {
           Value = acc.Value@[next.Value]
           Cache = next.Cache
           View = next.View
+          Path = state.Path
         })
       | Success acc, Partial (ids, next) -> 
         Partial (ids, {
           Value = acc.Value@[next.Value]
           Cache = next.Cache
           View = next.View
+          Path = state.Path
         })
       | Partial (ids, acc), Partial (ids2, next) -> 
         Partial ((Set.union ids ids2), {
           Value = acc.Value@[next.Value]
           Cache = next.Cache
           View = next.View
+          Path = state.Path
         })
       | _, Recursion (a,b) -> Recursion (a,b)
       | _, Error e -> Error e )
@@ -301,6 +328,7 @@ let parseAll (xs: seq<Parser<'T, 'E>>) (state: State<Unit>) (str: string) =
        Value = []
        Cache = state.Cache
        View = state.View
+       Path = state.Path
      })
 
 // returns longest sequence of successful parses
@@ -318,29 +346,34 @@ let parseLongest (xs: seq<Parser<'T, 'E>>) (state: State<Unit>) (str: string) =
           Value = acc.Value@[next.Value]
           Cache = next.Cache
           View = next.View
+          Path = state.Path
         }
       | Partial (ids, acc), Success next -> 
         Partial (ids, {
           Value = acc.Value@[next.Value]
           Cache = next.Cache
           View = next.View
+          Path = state.Path
         })
       | Success acc, Partial (ids, next) -> 
         Partial (ids, {
           Value = acc.Value@[next.Value]
           Cache = next.Cache
           View = next.View
+          Path = state.Path
         })
       | Partial (ids, acc), Partial (ids2, next) -> 
         Partial ((Set.union ids ids2), {
           Value = acc.Value@[next.Value]
           Cache = next.Cache
           View = next.View
+          Path = state.Path
         }))
      (Success {
        Value = []
        Cache = state.Cache
        View = state.View
+       Path = state.Path
      })
 
 // find best possible alternative
@@ -413,17 +446,20 @@ let tryParse (p: Parser<'T, 'E>) (state: State<Unit>) (str: string): ParseResult
       Value = Some x.Value
       View = x.View
       Cache = x.Cache
+      Path = x.Path
     }
   | Partial (ids, x) -> Partial (ids, {
       Value = Some x.Value
       View = x.View
       Cache = x.Cache
+      Path = x.Path
     })
   | Recursion (a, b) -> Recursion (a, b)
   | Error e -> Success {
     Value = None
     View = state.View
     Cache = e.Cache
+    Path = e.Path
   }
 
 module Seq = let rec cycle xs = seq { yield! xs; yield! cycle xs }
