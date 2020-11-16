@@ -73,33 +73,3 @@ let extend (b, right) (a, left): OpenTree<'Expr> =
 
 // closes the openTree from further extension
 let seal (x: OpenTree<'Expr>): 'Expr = (snd x) (Top id)
-
-
-// example:
-
-// type Expr =
-// | Plus of Expr * Expr
-// | Mult of Expr * Expr
-// | Id of string
-
-// let rec render (x: Expr) =
-//   match x with
-//   | Id str -> str
-//   | Plus (x, y) -> "(" + render x + " + " + render y + ")" 
-//   | Mult (x, y) -> "(" + render x + " * " + render y + ")"
-
-// let seedX = createSeed (Id "x") // x
-// let mulY = createRightPartial 20 Mult (Id "y") // ... * y
-// let addZ = createRightPartial 10 Plus (Id "z") // ... + z
-
-
-// let r = 
-//   seedX             // x
-//   |> extend addZ    // + z
-//   |> extend mulY    //    * y
-//   |> extend addZ    //        + z 
-//   |> extend mulY    //            * y
-//   |> extend addZ    //                + z
-//   |> seal
-
-// System.Console.WriteLine (render r) // (((x + (z * y)) + (z * y)) + z)

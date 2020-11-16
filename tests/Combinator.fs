@@ -2,6 +2,7 @@ module Tests.Combinator
 
 open Xunit
 open Figtree.Combinator
+open Figtree.OpenTree
 
 
 type Expr = 
@@ -9,13 +10,10 @@ type Expr =
 | Nested of Expr
 | Identifier of string 
 
-type InfixOperator<'T> =
-  {
-    Name: string
-    Left: int
-    Right: int
-    Args: List<'T>
-  }
+let rec render (x: Expr) =
+  match x with
+  | Identifier str -> str
+  | Op (op, x, y) -> "(" + render x + " " + op + " " + render y + ")" 
 
 type RecursiveExprTests() =
 
@@ -95,97 +93,87 @@ type RecursiveExprTests() =
       Assert.True(false)
 
 
-// type RepetitiveExprTests() =
+type RepetitiveExprTests() =
 
-//   let parseX: Parser<Expr, Unit> = Parse "x" {
-//     let! x = parseString "x"
-//     return Identifier x
-//   }
+  let parseX: Parser<Expr, Unit> = Parse "x" {
+    let! x = parseString "x"
+    return Identifier x
+  }
 
-//   let nested (expr: Parser<Expr, Unit>): Parser<Expr, Unit> = Parse ("nested", expr) {
-//     do! skipString "("
-//     let! x = expr
-//     do! skipString ")"
-//     return Nested x
-//   }
-
-//   let createExprTree (xs: List<Token*Expr>): Expr = 
-
-//     let precedenceTable = Map.ofSeq [
-//       ("", 0)
-//       ("+", 10)
-//       ("-", 10)
-//       ("*", 20)
-//       ("/", 20)
-//     ] 
-
-//     match xs with
-//     | (Token op1, ex)::(Token op2, ey)::tail -> ()
-
-//   let binary (expr: Parser<Expr, Unit>): Parser<Expr, Unit> = Parse ("binary", expr) {
-//     let! x =
-//       bestOf [
-//         parseX
-//         nested expr
-//       ]
-
-//     let! ys = 
-//       (Parse () {
-//         let! token = bestOf [
-//           parseString "+" |>  Parser.map Token
-//           parseString "*" |>  Parser.map Token
-//         ]
-
-//         let! node = bestOf [
-//           parseX
-//           nested expr
-//         ]
-//         return  (token, node)
-//       }) 
-//       |> repeat 1 0
+  let nested (expr: Parser<Expr, Unit>): Parser<Expr, Unit> = Parse ("nested", expr) {
+    do! skipString "("
+    let! x = expr
+    do! skipString ")"
+    return Nested x
+  }
 
 
-//     return createExprTree ((Token "", x)::ys)
-//   }
+  let binary (expr: Parser<Expr, Unit>): Parser<Expr, Unit> = Parse ("binary", expr) {
+    let! x =
+      bestOf [
+        parseX
+        nested expr
+      ]
+
+    let! ys = 
+      (Parse () {
+        let! op = bestOf [
+          parseString "+"
+          parseString "*" 
+        ]
+
+        let! rhs = bestOf [
+          parseX
+          nested expr
+        ]
+
+        let bp =
+          match op with
+          | "*" -> 20
+          | "/" -> 20
+          | "+" -> 10
+          | "-" -> 10
+          | _ -> 0
+
+        return right bp (fun (lhs, rhs) -> Op (op, lhs, rhs)) rhs 
+      }) 
+      |> repeat 1 0
     
-//   let rec expr = Parse "expr" {
-//     return! bestOf [
-//       binary expr 
-//       nested expr
-//       parseX
-//     ]
-//   }
+    let root = seed x
+    let exprTree = ys |> Seq.fold (fun tree branch -> tree |> extend branch) root |> seal
+    return exprTree
+  }
+    
+  let rec expr = Parse "expr" {
+    return! bestOf [
+      binary expr 
+      nested expr
+      parseX
+    ]
+  }
  
-//   [<Fact>]
-//   let ``can parse simple expr`` () =
-//     let str = "x+x"
-//     match Parser.parse expr str with
-//     | Success x -> 
-//       Assert.Equal(str.Length, x.View.End)
-//       ()
-//     | r -> 
-//       System.Console.WriteLine "ohh No"
-//       System.Console.WriteLine (string r)
-//       Assert.True(false)
+  [<Fact>]
+  let ``can parse simple expr`` () =
+    let str = "x"
+    match Parser.parse expr str with
+    | Success x -> 
+      Assert.Equal(str.Length, x.View.End)
+      ()
+    | r -> 
+      System.Console.WriteLine "ohh No"
+      System.Console.WriteLine (string r)
+      Assert.True(false)
 
-//   [<Fact>]
-//   let ``can parse simple expr with parents`` () =
-//     let str = "(x+x)"
-//     match Parser.parse expr str with
-//     | Success x -> 
-//       Assert.Equal(str.Length, x.View.End)
-//     | r -> 
-//       System.Console.WriteLine "ohh No"
-//       System.Console.WriteLine (string r)
-//       Assert.True(false)
-
-//   [<Fact>]
-//   let ``can parse complex expr`` () =
-//     let str = "(((((x)))+(x+x)))"
-//     match Parser.parse expr str with
-//     | Success x -> 
-//       Assert.Equal(str.Length, x.View.End)
-//     | r -> 
-//       System.Console.WriteLine "ohh No"
-//       System.Console.WriteLine (string r)
-//       Assert.True(false)
+ 
+  [<Fact>]
+  let ``can parse simple expr`` () =
+    let str = "x+x*x+x"
+    match Parser.parse expr str with
+    | Success x -> 
+      Assert.Equal(str.Length, x.View.End)
+      Assert.Equal(str.Length, x.View.End)
+      ()
+    | r -> 
+      System.Console.WriteLine "ohh No"
+      System.Console.WriteLine (string r)
+      Assert.True(false)

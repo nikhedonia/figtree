@@ -440,6 +440,31 @@ let rec bestOf (xs: List<Parser<'T, 'E>>) (state: State<Unit>) (str: string): Pa
   |> Seq.head
 
 
+
+// Return first and longest match
+let rec pstrings (xs: Set<string> ) (state: State<Unit>) (str: string): ParseResult<string, Unit> = 
+  let str = str.Substring(state.View.End);
+  let result = 
+    xs 
+    |> Seq.sortByDescending(fun x -> x.Length) 
+    |> Seq.tryFind (str.StartsWith)
+  match result with
+  | None -> Error {
+      Value = ()
+      View = state.View
+      Path = state.Path
+      Cache = state.Cache
+    }
+  | Some x -> Success {
+      Value = x
+      View = {
+        Start = state.View.End; 
+        End = state.View.End + x.Length 
+      }
+      Path = state.Path
+      Cache = state.Cache
+    }
+
 let tryParse (p: Parser<'T, 'E>) (state: State<Unit>) (str: string): ParseResult<Option<'T>, 'E> =
   match p state str with
   | Success x -> Success {
@@ -456,11 +481,11 @@ let tryParse (p: Parser<'T, 'E>) (state: State<Unit>) (str: string): ParseResult
     })
   | Recursion (a, b) -> Recursion (a, b)
   | Error e -> Success {
-    Value = None
-    View = state.View
-    Cache = e.Cache
-    Path = e.Path
-  }
+      Value = None
+      View = state.View
+      Cache = e.Cache
+      Path = e.Path
+    }
 
 module Seq = let rec cycle xs = seq { yield! xs; yield! cycle xs }
 
