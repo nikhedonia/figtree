@@ -123,8 +123,8 @@ module Parser =
       else Success state 
     loop
 
-  let map (f: 'T -> 'U) (r: ParseResult<'T, 'E>) =
-    match r with
+  let map (f: 'T -> 'U) (p: Parser<'T, 'E>) (state: State<Unit>) (str: string): ParseResult<'U,'E> =
+    match p state str with
     | Success s -> Success {
         Value = f s.Value
         Cache = s.Cache
@@ -138,8 +138,8 @@ module Parser =
     | Error e -> Error e
     | Recursion (a, b) -> Recursion (a, b)
 
-  let mapError (f: 'E -> 'U) (r: ParseResult<'T, 'E>) =
-    match r with
+  let mapError (f: 'E -> 'U) (p: Parser<'T, 'E>) (state: State<Unit>) (str: string): ParseResult<'T,'U> =
+    match p state str with
     | Success s -> Success s
     | Partial (ids, s) -> Partial (ids, s)
     | Error e -> Error {
@@ -149,7 +149,7 @@ module Parser =
       }
     | Recursion (a, b) -> Recursion (a, b)
 
-  let ignore (r: ParseResult<'T, 'E>) = map (ignore) r
+  let ignore (r: Parser<'T, 'E>) = map (ignore) r
 
 
 let noCache = () :> obj
@@ -232,6 +232,8 @@ let parseString (x: string) =
         }
       }
   f
+
+let skipString (x: string) = parseString x |> Parser.ignore
 
 
 let private isRecursion (k, v) =
@@ -424,7 +426,32 @@ let tryParse (p: Parser<'T, 'E>) (state: State<Unit>) (str: string): ParseResult
     Cache = e.Cache
   }
 
-let recursive<'T, 'E> (f: (Ref<Parser<'T, 'E>>) -> Parser<'T, 'E>): Parser<'T, 'E> =
+module Seq = let rec cycle xs = seq { yield! xs; yield! cycle xs }
+
+// repeats provided parser up to max times and fails if it had less than min repetitions
+// if max is null it will perform infinite repetitions
+let repeat (min: int) (max: int) (p: Parser<'T, 'E>) (state: State<Unit>) (str: string) =
+  let xs = Seq.cycle (seq { yield p })
+  let results =
+    parseLongest
+      (if max>0 
+      then xs |> Seq.take max
+      else xs) 
+      state
+      str
+  match results with
+  | Success x -> 
+    if x.Value |> Seq.length >= min
+    then Success x
+    else Error (Parser.strip x)
+  | Partial (ids, x) -> 
+    if x.Value |> Seq.length >= min
+    then Partial (ids, x)
+    else Error (Parser.strip x)
+  | Recursion (a, b) -> Recursion (a, b)
+  | Error x -> Error x 
+
+let recursive (f: (Ref<Parser<'T, 'E>>) -> Parser<'T, 'E>): Parser<'T, 'E> =
   let mutable self: Ref<Parser<'T, 'E>> = ref (Unchecked.defaultof<Parser<'T, 'E>>)
   self := f(self)
   !self
