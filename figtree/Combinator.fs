@@ -442,7 +442,7 @@ let rec bestOf (xs: List<Parser<'T, 'E>>) (state: State<Unit>) (str: string): Pa
 
 
 // Return first and longest match
-let rec pstrings (xs: Set<string> ) (state: State<Unit>) (str: string): ParseResult<string, Unit> = 
+let pstrings (xs: Set<string> ) (state: State<Unit>) (str: string): ParseResult<string, Unit> = 
   let str = str.Substring(state.View.End);
   let result = 
     xs 
@@ -464,6 +464,88 @@ let rec pstrings (xs: Set<string> ) (state: State<Unit>) (str: string): ParseRes
       Path = state.Path
       Cache = state.Cache
     }
+
+let pchars (xs: Set<char> ) (state: State<Unit>) (str: string): ParseResult<string, Unit> = 
+  let str = str.Substring(state.View.End);
+  let result = 
+    xs 
+    |> Seq.tryFind (str.StartsWith)
+  match result with
+  | None -> Error {
+      Value = ()
+      View = state.View
+      Path = state.Path
+      Cache = state.Cache
+    }
+  | Some x -> Success {
+      Value = (string x)
+      View = {
+        Start = state.View.End; 
+        End = state.View.End + 1 
+      }
+      Path = state.Path
+      Cache = state.Cache
+    }
+
+let pcharRange (a: char) (b: char) (state: State<Unit>) (str: string): ParseResult<string, Unit> = 
+  let c = str.[state.View.End];
+  match c <= b && c >= a with
+  | false -> Error {
+      Value = ()
+      View = state.View
+      Path = state.Path
+      Cache = state.Cache
+    }
+  | true -> Success {
+      Value = (string c)
+      View = {
+        Start = state.View.End; 
+        End = state.View.End + 1 
+      }
+      Path = state.Path
+      Cache = state.Cache
+    }
+
+let ptake (n: int) (state: State<Unit>) (str: string): ParseResult<string, Unit> = 
+  Success {
+    Value = str.Substring(state.View.End, n)
+    View = {
+      Start = state.View.End
+      End = state.View.End + n
+    }
+    Cache = state.Cache
+    Path = state.Path
+  }
+
+let lookBack (n: int) (state: State<Unit>) (str: string): ParseResult<string, Unit> =
+  if state.View.End >= n 
+  then
+    Success {
+      Value = str.Substring(state.View.End-n, n)
+      View = state.View
+      Cache = state.Cache
+      Path = state.Path
+    }
+  else 
+    Error state
+
+let takeWhile (f: 'S -> char -> 'S * bool) (initial: 'S) (state: State<Unit>) (str: string): ParseResult<string, Unit> =
+  let n = 
+    str.Substring(state.View.End)
+    |> seq
+    |> Seq.scan (fst>>f) (initial, true)
+    |> Seq.takeWhile snd
+    |> Seq.length
+    |> fun x -> x - 1
+    
+
+  Success {
+    Value = str.Substring(state.View.End, n)
+    View = {Start = state.View.End; End = state.View.End + n}
+    Cache = state.Cache
+    Path = state.Path
+  }
+
 
 let tryParse (p: Parser<'T, 'E>) (state: State<Unit>) (str: string): ParseResult<Option<'T>, 'E> =
   match p state str with
