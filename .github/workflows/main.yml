@@ -1,0 +1,30 @@
+name: CI
+
+on: [push]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    - name: Setup .NET Core SDK
+      uses: actions/setup-dotnet@v1.5.0
+      with:
+        dotnet-version: 5.x
+
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v2
+
+    - name: Build and test
+      run: |
+        dotnet restore
+        dotnet tool restore
+        dotnet paket install
+        dotnet build
+        dotnet test
+        dotnet fable ./figtree
+

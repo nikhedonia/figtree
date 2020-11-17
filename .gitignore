@@ -280,3 +280,7 @@ fsi.fsx
 
 .ionide
 */.ionide
+
+.paket
+paket-files
+packages
