@@ -6,11 +6,7 @@
     <ProjectReference Include="../figtree/figtree.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Utils.fs" />
-    <Compile Include="Verify.fs" />
-    <Compile Include="Recognize.fs" />
-    <Compile Include="Combinator.fs" />
-    <Compile Include="OpenTree.fs" />
+    <Compile Include="Json.fs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />

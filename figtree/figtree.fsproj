@@ -10,6 +10,7 @@
     <Compile Include="Recognize.fs" />
     <Compile Include="Produce.fs" />
     <Compile Include="Combinator.fs" />
+    <Compile Include="OpenTree.fs" />
   </ItemGroup>
 
   <ItemGroup>
