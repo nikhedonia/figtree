@@ -1,6 +1,9 @@
-name: CI
+name: Publish
 
-on: [push]
+on:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
 
@@ -10,14 +13,12 @@ jobs:
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       DOTNET_NOLOGO: true
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     - name: Setup .NET Core SDK
       uses: actions/setup-dotnet@v1.7.2
       with:
         dotnet-version: 5.0.100
 
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
 
     - name: Build and test
@@ -25,4 +26,9 @@ jobs:
         ./restore.sh
         ./build.sh
         ./test.sh
+
+    - name: Publish
+      run: |
+        dotnet pack --configuration Release ./figtree/figtree.fsproj
+        dotnet nuget push **/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{secrets.NUGET_API_KEY}}
 
