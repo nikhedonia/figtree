@@ -1,13 +1,13 @@
 source https://api.nuget.org/v3/index.json
 
-framework: netcoreapp5.0, netstandard2.1
+framework: net8.0, netstandard2.1
 nuget FSharp.Core
 
 group Test
 source https://api.nuget.org/v3/index.json
 
 storage: none
-framework: netcoreapp5.0, netstandard2.1
+framework: net8.0, netstandard2.1
 nuget FSharp.Core
 nuget dotnet-xunit
 nuget Microsoft.NET.Test.Sdk
