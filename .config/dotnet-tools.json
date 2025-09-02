@@ -3,16 +3,18 @@
   "isRoot": true,
   "tools": {
     "paket": {
-      "version": "5.257.0",
+      "version": "9.0.2",
       "commands": [
         "paket"
-      ]
+      ],
+      "rollForward": false
     },
     "fable": {
       "version": "3.0.0-nagareyama-rc-007",
       "commands": [
         "fable"
-      ]
+      ],
+      "rollForward": false
     }
   }
 }
