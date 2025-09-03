@@ -20,6 +20,7 @@ let rec render (x : Expr) =
     + " "
     + render y
     + ")"
+  | Nested x -> "(" + render x + ")"
 
 type RecursiveExprTests() =
 
@@ -143,7 +144,13 @@ type RepetitiveExprTests() =
       return exprTree
     }
 
-  let rec expr = Parse "expr" { return! bestOf [ binary expr; nested expr; parseX ] }
+  let expr =
+    recursive (fun self ->
+      Parse "expr" {
+        let expr = self.Value
+
+        return! bestOf [ binary expr; nested expr; parseX ]
+      })
 
   [<Fact>]
   let ``can parse simple expr`` () =

@@ -133,8 +133,13 @@ let parseJObj (json : Parser<Json, Unit>) =
     return JObj(Map.ofSeq pairs)
   }
 
-let rec parseJson =
-  Parse "Json" { return! bestOf [ parseJNumber; parseJString; parseJList parseJson; parseJObj parseJson ] }
+let parseJson =
+  recursive (fun self ->
+    Parse "Json" {
+      let parseJson = self.Value
+
+      return! bestOf [ parseJNumber; parseJString; parseJList parseJson; parseJObj parseJson ]
+    })
 
 type JSonTests() =
   [<Fact>]
@@ -152,11 +157,7 @@ type JSonTests() =
             JList []
             JList [ JInt 1 ]
             JList [ JInt 1 ]
-            JList
-              [
-                JInt 2
-                JInt 3
-              ]
+            JList [ JInt 2; JInt 3 ]
             JInt 4
           ],
         x.Value
