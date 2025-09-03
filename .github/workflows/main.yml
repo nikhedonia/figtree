@@ -17,9 +17,19 @@ jobs:
 
     - uses: actions/checkout@v2
 
-    - name: Build and test
+    - name: Restore
       run: |
-        ./restore.sh
-        ./build.sh
-        ./test.sh
+        dotnet tool restore
+        dotnet paket restore
 
+    - name: Build
+      run: |
+        dotnet build /WarnAsError
+
+    - name: Test
+      run: |
+        dotnet test
+
+    - name: Fable
+      run: |
+        dotnet tool run fable figtree

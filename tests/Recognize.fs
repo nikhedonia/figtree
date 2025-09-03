@@ -35,8 +35,8 @@ type MyTests() =
 
     let x =
       match recognize rules "expr" str 0 with
-      | Some(Tree((p, _) :: xs, s, e, _)) -> (p, s, e)
-      | None -> ("", 0, 0)
+      | Some(Tree((p, _) :: _, s, e, _)) -> (p, s, e)
+      | _ -> ("", 0, 0)
 
     Assert.Equal(x, ("expr", 0, str.Length))
 
