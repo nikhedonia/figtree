@@ -146,8 +146,11 @@ type RepetitiveExprTests() =
 
   let expr =
     recursive (fun self ->
-      let expr = self.Value
-      Parse "expr" { return! bestOf [ binary expr; nested expr; parseX ] })
+      Parse "expr" {
+        let expr = self.Value
+
+        return! bestOf [ binary expr; nested expr; parseX ]
+      })
 
   [<Fact>]
   let ``can parse simple expr`` () =
