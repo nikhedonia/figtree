@@ -4,7 +4,6 @@ open Xunit
 open Figtree.Combinator
 open Figtree.OpenTree
 
-
 type Expr =
   | Op of string * Expr * Expr
   | Nested of Expr
@@ -96,7 +95,6 @@ type RecursiveExprTests() =
       System.Console.WriteLine(string r)
       Assert.True(false)
 
-
 type RepetitiveExprTests() =
 
   let parseX : Parser<Expr, Unit> =
@@ -112,7 +110,6 @@ type RepetitiveExprTests() =
       do! skipString ")"
       return Nested x
     }
-
 
   let binary (expr : Parser<Expr, Unit>) : Parser<Expr, Unit> =
     Parse("binary", expr) {
@@ -160,7 +157,6 @@ type RepetitiveExprTests() =
       System.Console.WriteLine "ohh No"
       System.Console.WriteLine(string r)
       Assert.True(false)
-
 
   [<Fact>]
   let ``can parse simple expr`` () =

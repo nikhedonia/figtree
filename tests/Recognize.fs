@@ -12,25 +12,11 @@ type MyTests() =
       [
         "digit", CharRange('0', '9')
         "number", Repeat(Ref "digit", 1, 0)
-        "char",
-        AnyOf(
-          [
-            CharRange('a', 'z')
-            CharRange('A', 'Z')
-            CharSet(
-              set['_'
-                  '$']
-            )
-          ]
-        )
+        "char", AnyOf([ CharRange('a', 'z'); CharRange('A', 'Z'); CharSet(Set.ofSeq [ '_'; '$' ]) ])
         "charOrNum", AnyOf([ Ref "char"; Ref "digit" ])
         "identifier", EachOf [ Ref "char"; Repeat(Ref "charOrNum", 0, 0) ]
-        "ws", Repeat(CharSet(set[' ']), 1, 0)
-        "op",
-        CharSet(
-          set['-'
-              '+']
-        )
+        "ws", Repeat(CharSet(Set.singleton ' '), 1, 0)
+        "op", CharSet(Set.ofSeq [ '-'; '+' ])
         "expr", Ref "identifier"
         "expr", Ref "number"
         "expr",

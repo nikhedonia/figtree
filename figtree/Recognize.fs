@@ -32,7 +32,7 @@ let isRecursive (rt : RuleTable) (rule : Rule) =
         analyze (Set.add name visited) (RuleTable.rules rt).[name]
     | _ -> false
 
-  analyze (set []) rule
+  analyze Set.empty rule
 
 // check if all rules a rule can be expanded to...
 let nonZeroRefs (rt : RuleTable) (rule : Rule) =
@@ -64,7 +64,7 @@ let nonZeroRefs (rt : RuleTable) (rule : Rule) =
         analyze (Set.add name visited) (RuleTable.rules rt).[name]
     | _ -> visited
 
-  analyze (set []) rule
+  analyze Set.empty rule
 
 
 // hybrid top-down bottom-up parser

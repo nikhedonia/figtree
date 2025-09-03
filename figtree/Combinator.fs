@@ -51,6 +51,7 @@ let zero =
   }
 
 module Parser =
+
   let strip (s : State<_>) : State<Unit> =
     {
       Value = ()
@@ -261,7 +262,7 @@ type Parse(cacheKey : obj) =
           }
       | Some(Recurse id) ->
         // Recursion detected, don't continue computation
-        Recursion(set[id], state)
+        Recursion(Set.singleton id, state)
       | Some(Complete(v, value)) ->
         Success
           {
@@ -728,6 +729,7 @@ let tryParse (p : Parser<'T, 'E>) (state : State<Unit>) (str : string) : ParseRe
       }
 
 module Seq =
+
   let rec cycle xs =
     seq {
       yield! xs
