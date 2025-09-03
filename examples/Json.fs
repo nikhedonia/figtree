@@ -150,10 +150,13 @@ type JSonTests() =
           [
             JInt 1
             JList []
-            JList[JInt 1]
-            JList[JInt 1]
-            JList[JInt 2
-                  JInt 3]
+            JList [ JInt 1 ]
+            JList [ JInt 1 ]
+            JList
+              [
+                JInt 2
+                JInt 3
+              ]
             JInt 4
           ],
         x.Value
